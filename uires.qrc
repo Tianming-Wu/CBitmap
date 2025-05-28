@@ -1,0 +1,34 @@
+<RCC>
+    <qresource prefix="/">
+        <file alias="addimage">uires/addimage.png</file>
+        <file alias="circle">uires/circle.png</file>
+        <file alias="arrow">uires/cursor.svg</file>
+        <file alias="pen">uires/edit.svg</file>
+        <file alias="eraser">uires/eraser.png</file>
+        <file alias="export">uires/export.png</file>
+        <file alias="hand">uires/hand.svg</file>
+        <file alias="home">uires/home.svg</file>
+        <file alias="import">uires/importfile.png</file>
+        <file alias="info">uires/info.svg</file>
+        <file alias="rectangle">uires/rectangle.png</file>
+        <file alias="rectangle_filled">uires/rectangle_filled.png</file>
+        <file alias="redo">uires/redo.png</file>
+        <file alias="undo">uires/undo.png</file>
+        <file alias="line">uires/line.png</file>
+        <file alias="line_stripped">uires/strip_line.png</file>
+        <file alias="arrow-bl">uires/arrow-bl.png</file>
+        <file alias="arrow-br">uires/arrow-br.png</file>
+        <file alias="arrow-down">uires/arrow-down.png</file>
+        <file alias="arrow-left">uires/arrow-left.png</file>
+        <file alias="arrow-right">uires/arrow-right.png</file>
+        <file alias="arrow-tl">uires/arrow-tl.png</file>
+        <file alias="arrow-tr">uires/arrow-tr.png</file>
+        <file alias="arrow-up">uires/arrow-up.png</file>
+        <file alias="rotate-180">uires/rotate_180.png</file>
+        <file alias="rotate-clockwise">uires/rotate-clockwise.png</file>
+        <file alias="rotate-counterclockwise">uires/rotate-counterclockwise.png</file>
+        <file alias="selection">uires/selection.png</file>
+        <file alias="position">uires/position.png</file>
+        <file alias="link">uires/link.png</file>
+    </qresource>
+</RCC>
