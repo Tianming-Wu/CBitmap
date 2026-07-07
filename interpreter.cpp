@@ -15,6 +15,8 @@ QString Interpreter::toString(CodeMode mode)
         return toStringPadded();
     case PaddedVerticalCodeMode:
         return "";
+    default:
+        return ""; // invalid
     }
 }
 
@@ -27,6 +29,8 @@ QString Interpreter::parseString(const QString &ref, CodeMode mode)
         return parseStringPadded(ref);
     case PaddedVerticalCodeMode:
         return "";
+    default:
+        return ""; // invalid
     }
 }
 
@@ -39,7 +43,7 @@ QString Interpreter::toStringPadded()
     code += QString("const uint8_t frame_%1x%2[] = {\n    ").arg(size.width()).arg(size.height());
 
     for (int i = 0; i < byteArray.size(); i++) {
-        code += QString("0x%1, ").arg(byteArray.at(i), 2, 16, QLatin1Char('0'));
+        code += QString("0x%1, ").arg(static_cast<uchar>(byteArray.at(i)), 2, 16, QLatin1Char('0'));
     }
 
     code.chop(2);
@@ -53,7 +57,7 @@ QString Interpreter::parseStringPadded(const QString &code)
 {
     if(code.isEmpty()) return "Empty content";
 
-    QRegularExpression arrayRegex(
+    static QRegularExpression arrayRegex(
         R"(^(?:const\s+)?(?:unsigned\s+char|uint8_t)\s+(\w+)_(\d+)x(\d*)\[\d*\]\s*=\s*\{([^}]+)\};)",
         QRegularExpression::MultilineOption | QRegularExpression::DotMatchesEverythingOption
     );
@@ -75,15 +79,16 @@ QString Interpreter::parseStringPadded(const QString &code)
     QString dataStr = match.captured(4);
 
     // 验证类型
-    QRegularExpression typeRegex(R"(\b(unsigned char|uint8_t)\b)");
+    static QRegularExpression typeRegex(R"(\b(unsigned char|uint8_t)\b)");
+    static QRegularExpression typeSectionRegex(R"(\s+(\w+)\[)");
     if (!typeRegex.match(code).hasMatch()) {
         return QString("Unknown type: %1").arg(
-            code.section(QRegularExpression(R"(\s+(\w+)\[)"), 1, 1));
+            code.section(typeSectionRegex, 1, 1));
     }
 
     // 解析字节数据
     QVector<uint8_t> byteArray;
-    QRegularExpression hexRegex(R"(\b0x([0-9a-fA-F]{1,2})\b)");
+    static QRegularExpression hexRegex(R"(\b0x([0-9a-fA-F]{1,2})\b)");
     QRegularExpressionMatchIterator iter = hexRegex.globalMatch(dataStr);
 
     while (iter.hasNext()) {
@@ -128,8 +133,8 @@ QString Interpreter::parseStringPadded(const QString &code)
 QString Interpreter::toStringPaddedVertical()
 {
     QString code;
-    QByteArray byteArray = cbitmap->exportToByteArrayPadded();
-    QSize size = cbitmap->bitmapSize();
+    // QByteArray byteArray = cbitmap->exportToByteArrayPadded();
+    // QSize size = cbitmap->bitmapSize();
 
     // code += QString("const uint8_t frame_%1x%2[] = {\n    ").arg(size.width()).arg(size.height());
 

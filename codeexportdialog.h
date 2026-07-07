@@ -62,7 +62,7 @@ public:
     Q_ENUM(CodeMode)
     enum ButtonName { BtnCopyPaste, BtnSaveLoad, BtnExitImport, BtnCopyPasteNotify, BtnImportNotify, WindowTitle };
 
-    explicit CodeExportDialog(Interpreter& interpreter, QWidget *parent = nullptr, Mode mode = ExportMode, CodeMode codemode = PaddedCodeMode);
+    explicit CodeExportDialog(Interpreter& interpreter, Mode mode, QWidget *parent = nullptr, CodeMode codemode = PaddedCodeMode);
     ~CodeExportDialog();
 
     Mode mode() const { return m_mode; }

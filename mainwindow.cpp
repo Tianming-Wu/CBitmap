@@ -11,11 +11,12 @@
 
 #include <QWheelEvent>
 #include <QGraphicsProxyWidget>
+#include <QAction>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
-    , cbitmap(new CBitmap), scene(new QGraphicsScene(this))
+    , scene(new QGraphicsScene(this)), cbitmap(new CBitmap)
     , iconHandler(new IconHandler(this))
 {
     ui->setupUi(this);
@@ -27,7 +28,7 @@ MainWindow::MainWindow(QWidget *parent)
 
     view->setZoomRange(0.1, 10.0);
 
-    ui->pb_5->hide();
+    ui->pb_5->hide(); // Unused button
 
     // view->installEventFilter(this); // Now use Promoted widget, so no longer required
     // view->viewport()->installEventFilter(this);
@@ -35,6 +36,7 @@ MainWindow::MainWindow(QWidget *parent)
 
     proxy = scene->addWidget(cbitmap);
 
+    // Add mode icons
     ui->cbxPenMode->addItem(iconHandler->generateIcon("://line_stripped", 25, 25), "Free", CBitmap::PenFree);
     ui->cbxPenMode->addItem(iconHandler->generateIcon("://line", 25, 25), "Line", CBitmap::PenLine);
     ui->cbxPenMode->addItem(iconHandler->generateIcon("://rectangle", 25, 25), "Rectangle", CBitmap::PenRectangle);
@@ -66,18 +68,46 @@ MainWindow::MainWindow(QWidget *parent)
     });
 
     // Undo & Redo
-    connect(ui->pbUndo, &QPushButton::clicked, cbitmap->undoStack(), &QUndoStack::undo);
-    connect(ui->pbRedo, &QPushButton::clicked, cbitmap->undoStack(), &QUndoStack::redo);
-    connect(cbitmap->undoStack(), &QUndoStack::canUndoChanged, ui->pbUndo, &QPushButton::setEnabled);
-    connect(cbitmap->undoStack(), &QUndoStack::canRedoChanged, ui->pbRedo, &QPushButton::setEnabled);
+    auto undoAction = new QAction(this);
+    undoAction->setShortcuts({QKeySequence::Undo});
+    undoAction->setShortcutContext(Qt::WidgetWithChildrenShortcut);
+    addAction(undoAction);
+
+    auto redoAction = new QAction(this);
+    redoAction->setShortcuts({QKeySequence::Redo, QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_Z)});
+    redoAction->setShortcutContext(Qt::WidgetWithChildrenShortcut);
+    addAction(redoAction);
+
+    auto triggerUndo = [this](bool) {
+        if (!cbitmap->isDrawing()) {
+            cbitmap->undoStack()->undo();
+        }
+    };
+    auto triggerRedo = [this](bool) {
+        if (!cbitmap->isDrawing()) {
+            cbitmap->undoStack()->redo();
+        }
+    };
+
+    connect(ui->pbUndo, &QPushButton::clicked, this, triggerUndo);
+    connect(ui->pbRedo, &QPushButton::clicked, this, triggerRedo);
+    connect(undoAction, &QAction::triggered, this, triggerUndo);
+    connect(redoAction, &QAction::triggered, this, triggerRedo);
+    connect(cbitmap->undoStack(), &QUndoStack::canUndoChanged, this, [this](bool canUndo){
+        ui->pbUndo->setEnabled(canUndo && !cbitmap->isDrawing());
+    });
+    connect(cbitmap->undoStack(), &QUndoStack::canRedoChanged, this, [this](bool canRedo){
+        ui->pbRedo->setEnabled(canRedo && !cbitmap->isDrawing());
+    });
+    connect(cbitmap, &CBitmap::drawingStateChanged, this, [this, undoAction, redoAction](bool drawing){
+        ui->pbUndo->setEnabled(cbitmap->undoStack()->canUndo() && !drawing);
+        ui->pbRedo->setEnabled(cbitmap->undoStack()->canRedo() && !drawing);
+        undoAction->setEnabled(!drawing);
+        redoAction->setEnabled(!drawing);
+    });
 
     // View
-    connect(ui->pbResetView, &QPushButton::clicked, this, [&](){
-        view->resetTransform();
-        view->centerOn(proxy);
-        m_currentScale = DEFAULT_SCALE;
-        updateZoomLabel(view->currentZoom());
-    });
+    connect(ui->pbResetView, &QPushButton::clicked, this, &MainWindow::resetView);
 
     connect(cbitmap, &CBitmap::bitmapSizeChanged, this, &MainWindow::updateView);
     connect(cbitmap, &CBitmap::bitmapSizeChanged, this, &MainWindow::updateResolutionLabel);
@@ -134,7 +164,7 @@ void MainWindow::updateView()
     scene->setSceneRect(cbitmap->generateSceneRect());
     proxy->setGeometry(cbitmap->generateGeometry());
     // qDebug() << cbitmap->generateSceneRect() << cbitmap->generateGeometry();
-    view->resetTransform();
+    view->resetView();
     view->centerOn(proxy);
 }
 
@@ -147,6 +177,14 @@ void MainWindow::updateZoomLabel(qreal zoom)
 {
     // The first step in rendering was already 400%
     ui->lbZoom->setText(QString::number(static_cast<int>(zoom*400)) + "%");
+}
+
+void MainWindow::resetView()
+{
+    view->resetView();
+    view->centerOn(proxy);
+    m_currentScale = DEFAULT_SCALE;
+    updateZoomLabel(view->currentZoom());
 }
 
 // bool MainWindow::eventFilter(QObject *object, QEvent *event)

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QWidget>
+#include <QKeyEvent>
 #include <QVector>
 #include <QUndoStack>
 #include <QUndoCommand>
@@ -26,13 +27,22 @@ public:
     explicit CBitmap(const QSize& size, QWidget *parent = nullptr);
     ~CBitmap();
 
+    bool isDrawing() const { return m_isDrawing; }
+
     // 二值位图数据结构
     struct Frame {
         QVector<bool> data;
         QSize size;
 
+        enum class Alignment {
+            Top, Left, Right, Bottom,
+            Topleft, BottomLeft, TopRight, BottomRight,
+            Center
+        };
+
         Frame(){}
         Frame(const QSize& size):data(QVector<bool>(size.width()*size.height(), false)), size(size) {}
+        Frame(const QSize& size, const Frame& src, Alignment align); // Move the frame
 
         inline void clear() { data.fill(false); }
         inline bool& at(int x, int y) { return data[y * size.width() + x]; }
@@ -81,6 +91,7 @@ public:
     bool showGrid() const { return m_showGrid; }
 
     bool loadFrame(const Frame& frame);
+    void resizeFrame(const QSize& size, Frame::Alignment falign);
 
     QRect validGeometry(const QRect& orig) const;
     QRect generateGeometry() const;
@@ -96,6 +107,8 @@ public slots:
     void setActionMode(ActionMode actionMode);
     void setShowGrid(bool showGrid);
 
+    void newFrame(const QSize& size);
+
 signals:
     void bitmapSizeChanged(QSize);
     void penModeChanged(PenMode);
@@ -103,12 +116,15 @@ signals:
     void actionModeChanged(ActionMode);
     void showGridChanged(bool);
     void cursorUpdated(const QString& status);
+    void drawingStateChanged(bool drawing);
 
 protected:
     void paintEvent(QPaintEvent *event) override;
     void mousePressEvent(QMouseEvent *event) override;
     void mouseMoveEvent(QMouseEvent *event) override;
     void mouseReleaseEvent(QMouseEvent *event) override;
+    void keyPressEvent(QKeyEvent *event) override;
+    void keyReleaseEvent(QKeyEvent *event) override;
     void enterEvent(QEnterEvent *event) override;
     void leaveEvent(QEvent *event) override;
     // void resizeEvent(QResizeEvent *event) override;
@@ -118,12 +134,13 @@ private: // Functions
     void drawPixel(int x, int y);
     void drawLine(const QPoint& p1, const QPoint& p2);
     void drawRectangle(const QPoint& p1, const QPoint& p2);
-    void drawCircle(const QPoint& center, int radius);
+    void drawCircle(const QPointF& center, qreal radius);
 
     QString formatPosition(const QPoint& pos) const;
+    QString formatPosition(const QPointF& pos) const;
     QString formatLine(const QPoint& p1, const QPoint& p2) const;
     QString formatRect(const QPoint& p1, const QPoint& p2) const;
-    QString formatCircle(const QPoint& center, const QPoint& edge) const;
+    QString formatCircle(const QPointF& center, const QPointF& edge) const;
     void updateStatus(const QString& status);
 
     void mergePreview();
@@ -131,6 +148,9 @@ private: // Functions
     void general_Init();
 
     QPoint widgetToBitmapPos(const QPoint& pos) const;
+    QPointF widgetToBitmapPosF(const QPointF& pos) const;
+    QPointF snapToHalfGrid(const QPointF& pos) const;
+    void updateCirclePreview(const QPointF& currentPosF, Qt::KeyboardModifiers modifiers);
 
 private: // Members
 
@@ -153,6 +173,8 @@ private: // Members
     bool m_isDrawing = false;
     QPoint m_lastPos;
     QPoint m_startPos; // 用于形状绘制
+    QPointF m_startCirclePos;
+    QPointF m_lastCirclePosF;
 
     // Undo
     QUndoStack* m_undoStack;

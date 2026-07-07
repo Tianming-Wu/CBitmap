@@ -56,13 +56,13 @@ QComboBox QAbstractItemView {
      </rect>
     </property>
     <property name="renderHints">
-     <set>QPainter::Antialiasing|QPainter::SmoothPixmapTransform</set>
+     <set>QPainter::RenderHint::Antialiasing|QPainter::RenderHint::SmoothPixmapTransform</set>
     </property>
     <property name="transformationAnchor">
-     <enum>QGraphicsView::AnchorUnderMouse</enum>
+     <enum>QGraphicsView::ViewportAnchor::AnchorUnderMouse</enum>
     </property>
     <property name="viewportUpdateMode">
-     <enum>QGraphicsView::FullViewportUpdate</enum>
+     <enum>QGraphicsView::ViewportUpdateMode::FullViewportUpdate</enum>
     </property>
    </widget>
    <widget class="IndicatorButton" name="pbPen">
@@ -317,7 +317,7 @@ QComboBox QAbstractItemView {
      </rect>
     </property>
     <property name="text">
-     <string>100%</string>
+     <string>400%</string>
     </property>
    </widget>
    <widget class="QComboBox" name="cbxFillMode">
@@ -411,14 +411,14 @@ QComboBox QAbstractItemView {
  </widget>
  <customwidgets>
   <customwidget>
-   <class>MyGraphicsArea</class>
-   <extends>QGraphicsView</extends>
-   <header>mygrar.h</header>
-  </customwidget>
-  <customwidget>
    <class>IndicatorButton</class>
    <extends>QPushButton</extends>
    <header>indicatorbutton.h</header>
+  </customwidget>
+  <customwidget>
+   <class>MyGraphicsArea</class>
+   <extends>QGraphicsView</extends>
+   <header>mygrar.h</header>
   </customwidget>
  </customwidgets>
  <resources>

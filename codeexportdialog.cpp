@@ -8,14 +8,22 @@
 #include <QMessageBox>
 #include <QTimer>
 
-CodeExportDialog::CodeExportDialog(Interpreter &interpreter, QWidget *parent, Mode mode, CodeMode codemode)
+CodeExportDialog::CodeExportDialog(Interpreter &interpreter, Mode mode, QWidget *parent, CodeMode codemode)
     : QDialog(parent)
     , ui(new Ui::CodeExportDialog)
     , interpreter(interpreter)
+    , m_mode(mode)
+    , m_codeMode(codemode)
 {
     ui->setupUi(this);
 
     highlighter = new CodeHighlighter(ui->textEdit->document());
+    ui->cbxMethod->setCurrentIndex(static_cast<int>(m_codeMode));
+
+    connect(ui->cbxMethod, qOverload<int>(&QComboBox::currentIndexChanged), this, [this](int index){
+        setCodeMode(static_cast<CodeMode>(index));
+    });
+
     setMode(mode);
 
     connect(ui->pbCopyPaste, &QPushButton::clicked, this, &CodeExportDialog::onCopyPasteClicked);
@@ -40,7 +48,7 @@ CodeExportDialog::~CodeExportDialog()
 void CodeExportDialog::setMode(Mode mode)
 {
     if(mode == ExportMode) {
-        ui->textEdit->setPlainText(interpreter.toString());
+        ui->textEdit->setPlainText(interpreter.toString(static_cast<Interpreter::CodeMode>(m_codeMode)));
     } else {
         ui->textEdit->clear();
     }
@@ -54,9 +62,11 @@ void CodeExportDialog::setMode(Mode mode)
 
 void CodeExportDialog::setCodeMode(CodeMode codemode)
 {
-
-
     m_codeMode = codemode;
+
+    if (m_mode == ExportMode) {
+        ui->textEdit->setPlainText(interpreter.toString(static_cast<Interpreter::CodeMode>(m_codeMode)));
+    }
 }
 
 void CodeExportDialog::onCopyPasteClicked()
@@ -128,7 +138,7 @@ void CodeExportDialog::onExitImportClicked()
     if(m_mode == ExportMode) {
         done(0);
     } else {
-        QString err = interpreter.parseString(ui->textEdit->toPlainText());
+        QString err = interpreter.parseString(ui->textEdit->toPlainText(), static_cast<Interpreter::CodeMode>(m_codeMode));
         if(err.isEmpty()) {
             ui->pbExitImport->setText(getUIElementName(BtnImportNotify));
             QTimer::singleShot(250, this, [this](){
@@ -170,8 +180,9 @@ QString CodeExportDialog::getUIElementName(ButtonName name)
             return "Success";
         case WindowTitle:
             return "Import from Code / File";
-        }
+       }
     }
+    return "[ERROR]";
 }
 
 // codeexportdialog.cpp

@@ -25,6 +25,7 @@ public slots:
     void updateView();
     void updateResolutionLabel(const QSize& size);
     void updateZoomLabel(qreal zoom);
+    void resetView();
 
 // protected:
 //     bool eventFilter(QObject *object, QEvent *event);

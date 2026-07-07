@@ -1,5 +1,7 @@
 #include "cbitmap.h"
 
+#include <QCursor>
+#include <QGuiApplication>
 #include <QPainter>
 #include <QMouseEvent>
 #include <cmath>
@@ -45,7 +47,9 @@ void CBitmap::setBitmapSize(const QSize& size)
     m_lastState.data.fill(false);
 
     m_undoStack->clear();
-    // saveState(); // 将空白状态作为第一个有效状态
+
+    // 重置缩放
+    ///TODO: 重置缩放
 
     emit bitmapSizeChanged(size);
     update();
@@ -180,6 +184,24 @@ QRect CBitmap::generateSceneRect() const
     return QRect(0, 0, 8*bitmapSize().width(), 8*bitmapSize().height());
 }
 
+void CBitmap::newFrame(const QSize &size)
+{
+    Frame newFrame;
+    newFrame.size = size;
+    newFrame.data.resize(size.width()*size.height());
+    loadFrame(newFrame);
+
+    emit bitmapSizeChanged(size);
+}
+
+void CBitmap::resizeFrame(const QSize &size, Frame::Alignment falign)
+{
+    Frame newFrame(size, m_frame, falign);
+    loadFrame(newFrame);
+
+    emit bitmapSizeChanged(size); // use the same signal
+}
+
 void CBitmap::paintEvent(QPaintEvent *event)
 {
     Q_UNUSED(event);
@@ -281,6 +303,52 @@ QPoint CBitmap::widgetToBitmapPos(const QPoint& pos) const
     return QPoint(x, y);
 }
 
+QPointF CBitmap::widgetToBitmapPosF(const QPointF& pos) const
+{
+    if (m_frame.size.width() <= 0 || m_frame.size.height() <= 0) {
+        return QPointF(0.0, 0.0);
+    }
+
+    const qreal x = pos.x() * m_frame.size.width() / width();
+    const qreal y = pos.y() * m_frame.size.height() / height();
+
+    return QPointF(
+        qBound<qreal>(0.0, x, static_cast<qreal>(m_frame.size.width())),
+        qBound<qreal>(0.0, y, static_cast<qreal>(m_frame.size.height()))
+    );
+}
+
+QPointF CBitmap::snapToHalfGrid(const QPointF& pos) const
+{
+    if (m_frame.size.width() <= 0 || m_frame.size.height() <= 0) {
+        return QPointF(0.0, 0.0);
+    }
+
+    const qreal snappedX = qRound(pos.x() * 2.0) / 2.0;
+    const qreal snappedY = qRound(pos.y() * 2.0) / 2.0;
+
+    return QPointF(
+        qBound<qreal>(0.0, snappedX, static_cast<qreal>(m_frame.size.width())),
+        qBound<qreal>(0.0, snappedY, static_cast<qreal>(m_frame.size.height()))
+    );
+}
+
+void CBitmap::updateCirclePreview(const QPointF& currentPosF, Qt::KeyboardModifiers modifiers)
+{
+    const QPointF center = (modifiers & Qt::ShiftModifier)
+        ? snapToHalfGrid(m_startCirclePos)
+        : m_startCirclePos;
+
+    m_previewFrame.clear();
+
+    const qreal dx = currentPosF.x() - center.x();
+    const qreal dy = currentPosF.y() - center.y();
+    const qreal radius = std::hypot(dx, dy);
+
+    drawCircle(center, radius);
+    updateStatus(formatCircle(center, currentPosF));
+}
+
 void CBitmap::saveState()
 {
     if(m_frame.data != m_lastState.data) {
@@ -364,53 +432,39 @@ void CBitmap::drawRectangle(const QPoint& p1, const QPoint& p2)
     }
 }
 
-void CBitmap::drawCircle(const QPoint& center, int radius)
+void CBitmap::drawCircle(const QPointF& center, qreal radius)
 {
     if (radius < 0) return;
 
-    int x = radius;
-    int y = 0;
-    int err = 0;
+    const int minX = qMax(0, static_cast<int>(std::floor(center.x() - radius - 0.5)));
+    const int maxX = qMin(m_frame.size.width() - 1, static_cast<int>(std::ceil(center.x() + radius - 0.5)));
+    const int minY = qMax(0, static_cast<int>(std::floor(center.y() - radius - 0.5)));
+    const int maxY = qMin(m_frame.size.height() - 1, static_cast<int>(std::ceil(center.y() + radius - 0.5)));
 
-    while (x >= y) {
-        // 绘制8个对称点
-        drawPixel(center.x() + x, center.y() + y);
-        drawPixel(center.x() + y, center.y() + x);
-        drawPixel(center.x() - y, center.y() + x);
-        drawPixel(center.x() - x, center.y() + y);
-        drawPixel(center.x() - x, center.y() - y);
-        drawPixel(center.x() - y, center.y() - x);
-        drawPixel(center.x() + y, center.y() - x);
-        drawPixel(center.x() + x, center.y() - y);
+    const qreal innerRadius = qMax<qreal>(0.0, radius - 0.5);
+    const qreal outerRadius = radius + 0.5;
+    const qreal innerRadius2 = innerRadius * innerRadius;
+    const qreal outerRadius2 = outerRadius * outerRadius;
 
-        // 改进的判断条件
-        if (err <= 0) {
-            y += 1;
-            err += 2*y + 1;
-        }
-        if (err > 0) {
-            x -= 1;
-            err -= 2*x + 1;
-        }
-    }
-    if (m_fillMode == FillSolid) {
-        // 优化的填充算法 - 只填充有效区域
-        for (int dy = -radius; dy <= radius; ++dy) {
-            for (int dx = -radius; dx <= radius; ++dx) {
-                // 检查是否在圆内 (使用平方比较避免sqrt)
-                if (dx*dx + dy*dy <= radius*radius) {
-                    drawPixel(center.x() + dx, center.y() + dy);
+    for (int y = minY; y <= maxY; ++y) {
+        for (int x = minX; x <= maxX; ++x) {
+            const qreal dx = (x + 0.5) - center.x();
+            const qreal dy = (y + 0.5) - center.y();
+            const qreal dist2 = dx * dx + dy * dy;
+
+            if (m_fillMode == FillSolid) {
+                if (dist2 <= outerRadius2) {
+                    drawPixel(x, y);
+                }
+            } else {
+                if (dist2 >= innerRadius2 && dist2 <= outerRadius2) {
+                    drawPixel(x, y);
                 }
             }
         }
     }
 
-    // if (m_fillMode == FillNone) {
-    //     for (int i = -radius; i <= radius; i++) {
-    //         drawPixel(center.x() + i, center.y()); // 水平轴
-    //         drawPixel(center.x(), center.y() + i); // 垂直轴
-    //     }
-    // }
+    // 旧的整数圆心算法在偶数尺寸下会吸附到格点中心；现在使用浮点圆心避免该限制。
 }
 // {
 //     int x0 = center.x();
@@ -473,7 +527,7 @@ void CBitmap::mergePreview()
 void CBitmap::general_Init()
 {
     // setAttribute(Qt::WA_TransparentForMouseEvents, false); // 确保不阻止鼠标事件? (originally false)
-    setFocusPolicy(Qt::NoFocus);
+    setFocusPolicy(Qt::StrongFocus);
     m_undoStack->setUndoLimit(15);
     clear();
 }
@@ -482,8 +536,12 @@ void CBitmap::mousePressEvent(QMouseEvent *event)
 {
     if (event->button() == Qt::LeftButton) {
         m_isDrawing = true;
+        emit drawingStateChanged(true);
         // setMouseTracking(true);
+        setFocus(Qt::MouseFocusReason);
         m_startPos = m_lastPos = widgetToBitmapPos(event->pos());
+        m_startCirclePos = widgetToBitmapPosF(event->position());
+        m_lastCirclePosF = m_startCirclePos;
         QString status;
 
         switch (m_penMode) {
@@ -491,8 +549,10 @@ void CBitmap::mousePressEvent(QMouseEvent *event)
             drawPixel(m_lastPos.x(), m_lastPos.y());
         case PenLine:
         case PenRectangle:
-        case PenCircle:
             status = formatPosition(m_startPos);
+            break;
+        case PenCircle:
+            status = formatPosition(m_startCirclePos);
             break;
         default:
             break;
@@ -504,6 +564,7 @@ void CBitmap::mousePressEvent(QMouseEvent *event)
 void CBitmap::mouseMoveEvent(QMouseEvent *event)
 {
     QPoint currentPos = widgetToBitmapPos(event->pos());
+    QPointF currentPosF = widgetToBitmapPosF(event->position());
     QString status;
 
     if (m_isDrawing) {
@@ -525,13 +586,9 @@ void CBitmap::mouseMoveEvent(QMouseEvent *event)
             drawRectangle(m_startPos, currentPos);
             break;
         case PenCircle: {
-            status = formatCircle(m_startPos, currentPos);
-            m_previewFrame.clear();
-            int radius = static_cast<int>(std::sqrt(
-                std::pow(currentPos.x() - m_startPos.x(), 2) +
-                std::pow(currentPos.y() - m_startPos.y(), 2)
-                ));
-            drawCircle(m_startPos, radius);
+            m_lastCirclePosF = currentPosF;
+            updateCirclePreview(currentPosF, event->modifiers());
+            status = m_lastStatus;
             break;
         }
         default:
@@ -552,7 +609,30 @@ void CBitmap::mouseReleaseEvent(QMouseEvent *event)
         updateStatus(formatPosition(widgetToBitmapPos(event->pos())));
         m_isDrawing = false;
         mergePreview();
+        emit drawingStateChanged(false);
     }
+}
+
+void CBitmap::keyPressEvent(QKeyEvent *event)
+{
+    if (m_isDrawing && m_penMode == PenCircle && event->key() == Qt::Key_Shift) {
+        updateCirclePreview(m_lastCirclePosF, event->modifiers());
+        event->accept();
+        return;
+    }
+
+    QWidget::keyPressEvent(event);
+}
+
+void CBitmap::keyReleaseEvent(QKeyEvent *event)
+{
+    if (m_isDrawing && m_penMode == PenCircle && event->key() == Qt::Key_Shift) {
+        updateCirclePreview(m_lastCirclePosF, event->modifiers());
+        event->accept();
+        return;
+    }
+
+    QWidget::keyReleaseEvent(event);
 }
 
 void CBitmap::enterEvent(QEnterEvent *event)
@@ -579,6 +659,10 @@ QString CBitmap::formatPosition(const QPoint& pos) const {
     return QString("(%1, %2)").arg(pos.x()).arg(pos.y());
 }
 
+QString CBitmap::formatPosition(const QPointF& pos) const {
+    return QString("(%1, %2)").arg(pos.x(), 0, 'f', 2).arg(pos.y(), 0, 'f', 2);
+}
+
 QString CBitmap::formatLine(const QPoint& p1, const QPoint& p2) const {
     return QString("%1->%2")
         .arg(formatPosition(p1))
@@ -593,13 +677,13 @@ QString CBitmap::formatRect(const QPoint& p1, const QPoint& p2) const {
         .arg(width).arg(height);
 }
 
-QString CBitmap::formatCircle(const QPoint& center, const QPoint& edge) const {
-    int dx = edge.x() - center.x();
-    int dy = edge.y() - center.y();
-    int radius = static_cast<int>(sqrt(dx*dx + dy*dy));
+QString CBitmap::formatCircle(const QPointF& center, const QPointF& edge) const {
+    const qreal dx = edge.x() - center.x();
+    const qreal dy = edge.y() - center.y();
+    const qreal radius = std::hypot(dx, dy);
     return QString("%1, r=%2")
-        .arg(formatLine(center, edge))
-        .arg(radius);
+    .arg(QString("%1->%2").arg(formatPosition(center), formatPosition(edge)))
+        .arg(radius, 0, 'f', 2);
 }
 
 void CBitmap::updateStatus(const QString& status) {
@@ -613,3 +697,69 @@ void CBitmap::setPenMode(PenMode penMode) { emit penModeChanged((m_penMode = pen
 void CBitmap::setFillMode(FillMode fillMode) { emit fillModeChanged((m_fillMode = fillMode)); }
 void CBitmap::setActionMode(ActionMode actionMode) { emit actionModeChanged((m_actionMode = actionMode)); }
 void CBitmap::setShowGrid(bool showGrid) { emit showGridChanged((m_showGrid = showGrid)); update(); }
+
+CBitmap::Frame::Frame(const QSize& size, const Frame &src, Alignment align)
+    : data(QVector<bool>(size.width() * size.height(), false)), size(size)
+{
+    int new_w = size.width();
+    int new_h = size.height();
+    int src_w = src.size.width();
+    int src_h = src.size.height();
+
+    // 计算源Frame左上角在新Frame中的偏移量
+    int offset_x = 0, offset_y = 0;
+
+    switch (align) {
+    // 水平对齐：Top, Bottom, Center (这些影响垂直位置)
+    case Alignment::Top:
+        offset_x = (new_w - src_w) / 2;
+        offset_y = 0;
+        break;
+    case Alignment::Bottom:
+        offset_x = (new_w - src_w) / 2;
+        offset_y = new_h - src_h;
+        break;
+    case Alignment::Left:
+        offset_x = 0;
+        offset_y = (new_h - src_h) / 2;
+        break;
+    case Alignment::Right:
+        offset_x = new_w - src_w;
+        offset_y = (new_h - src_h) / 2;
+        break;
+    case Alignment::Center:
+        offset_x = (new_w - src_w) / 2;
+        offset_y = (new_h - src_h) / 2;
+        break;
+    case Alignment::Topleft:
+        offset_x = 0;
+        offset_y = 0;
+        break;
+    case Alignment::TopRight:
+        offset_x = new_w - src_w;
+        offset_y = 0;
+        break;
+    case Alignment::BottomLeft:
+        offset_x = 0;
+        offset_y = new_h - src_h;
+        break;
+    case Alignment::BottomRight:
+        offset_x = new_w - src_w;
+        offset_y = new_h - src_h;
+        break;
+    }
+
+    // 复制源Frame的像素到新Frame
+    // 支持放大、缩小和源Frame比新Frame大的情况
+    for (int src_y = 0; src_y < src_h; ++src_y) {
+        for (int src_x = 0; src_x < src_w; ++src_x) {
+            int new_x = src_x + offset_x;
+            int new_y = src_y + offset_y;
+
+            // 检查新位置是否在新Frame的范围内
+            if (new_x >= 0 && new_x < new_w && new_y >= 0 && new_y < new_h) {
+                at(new_x, new_y) = src.at(src_x, src_y);
+            }
+        }
+    }
+}

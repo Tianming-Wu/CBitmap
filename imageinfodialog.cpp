@@ -7,6 +7,25 @@
 
 #include <functional>
 
+namespace {
+CBitmap::Frame::Alignment toFrameAlignment(int alignId)
+{
+    using A = CBitmap::Frame::Alignment;
+    switch (alignId) {
+    case 0: return A::Topleft;
+    case 1: return A::Top;
+    case 2: return A::TopRight;
+    case 3: return A::Left;
+    case 4: return A::Center;
+    case 5: return A::Right;
+    case 6: return A::BottomLeft;
+    case 7: return A::Bottom;
+    case 8: return A::BottomRight;
+    default: return A::Center;
+    }
+}
+}
+
 ImageInfoDialog::ImageInfoDialog(CBitmap *cbitmap, QWidget *parent)
     : QDialog(parent)
     , ui(new Ui::ImageInfoDialog)
@@ -50,6 +69,13 @@ ImageInfoDialog::ImageInfoDialog(CBitmap *cbitmap, QWidget *parent)
 
     connect(ui->pbApply, &QPushButton::clicked, this, &ImageInfoDialog::onApply);
     connect(ui->pbExit, &QPushButton::clicked, this, &ImageInfoDialog::onExit);
+
+    // Spin box
+    connect(ui->ni_spnWidth, &QSpinBox::valueChanged, this, &ImageInfoDialog::onSizeSpinChange_ni);
+    connect(ui->ni_spnHeight, &QSpinBox::valueChanged, this, &ImageInfoDialog::onSizeSpinChange_ni);
+
+    connect(ui->ad_spnWidth, &QSpinBox::valueChanged, this, &ImageInfoDialog::onSizeSpinChange_ad);
+    connect(ui->ad_spnHeight, &QSpinBox::valueChanged, this, &ImageInfoDialog::onSizeSpinChange_ad);
 }
 
 ImageInfoDialog::~ImageInfoDialog()
@@ -75,15 +101,17 @@ void ImageInfoDialog::onApply()
     case PageNewImage: {
         QSize newSize = QSize(ui->ni_spnWidth->value(), ui->ni_spnHeight->value());
         if(newSize.width() > 0 && newSize.height() > 0) {
-            CBitmap::Frame newFrame;
-            newFrame.size = newSize;
-            newFrame.data.resize(newSize.width()*newSize.height());
-            m_cbitmap->loadFrame(newFrame);
+            m_cbitmap->newFrame(newSize);
             accept();
         } else QMessageBox::warning(this, "new Image", QString("Invalid Size: %1*%2").arg(newSize.width()).arg(newSize.height()));
         return;
     }
     case PageAdjust: {
+        QSize newSize = QSize(ui->ad_spnWidth->value(), ui->ad_spnHeight->value());
+        if(newSize.width() > 0 && newSize.height() > 0) {
+            m_cbitmap->resizeFrame(newSize, toFrameAlignment(static_cast<int>(align)));
+            accept();
+        } else QMessageBox::warning(this, "Adjust Image", QString("Invalid Size: %1*%2").arg(newSize.width()).arg(newSize.height()));
         break;
     }
     default:
@@ -104,7 +132,7 @@ void ImageInfoDialog::onSizeSpinChange_ni()
         ui->ni_spnHeight->blockSignals(true);
         ui->ni_spnHeight->setValue(ui->ni_spnWidth->value() / aspect);
         ui->ni_spnHeight->blockSignals(false);
-    }else{
+    } else {
         ui->ni_spnWidth->blockSignals(true);
         ui->ni_spnWidth->setValue(ui->ni_spnHeight->value() * aspect);
         ui->ni_spnWidth->blockSignals(false);
@@ -115,7 +143,7 @@ void ImageInfoDialog::onSizeSpinChange_ad()
 {
     if(!ui->ad_chkAspectRatio->isChecked()) return;
 
-    if(sender() == ui->ni_spnWidth){
+    if(sender() == ui->ad_spnWidth){
         ui->ad_spnHeight->blockSignals(true);
         ui->ad_spnHeight->setValue(ui->ad_spnWidth->value() / aspect);
         ui->ad_spnHeight->blockSignals(false);
@@ -130,6 +158,7 @@ void ImageInfoDialog::onAdjustAlignmentChanged(int id)
 {
     int i = id/3, j = id%3;
 
+    // Set the icon
     static std::function<void(int,int,int,int)> seticon = [this](int i, int j, int dx, int dy) {
 
         static QIcon iconmap[9] = {QIcon("://arrow-tl"), QIcon("://arrow-up"), QIcon("://arrow-tr"),
@@ -188,4 +217,5 @@ QString ImageInfoDialog::getUIElementName(UIElementName name)
     default:
         return "[ERROR]";
     }
+    return "[ERROR]";
 }
