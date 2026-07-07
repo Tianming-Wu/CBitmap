@@ -27,7 +27,7 @@ public:
     };
 
 private slots:
-    void updateUIElememts();
+    void updateUIElements();
 
     void onApply();
     void onExit();

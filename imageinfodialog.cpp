@@ -65,7 +65,7 @@ ImageInfoDialog::ImageInfoDialog(CBitmap *cbitmap, QWidget *parent)
     connect(btnAlignGroup, &QButtonGroup::idClicked, this, &ImageInfoDialog::onAdjustAlignmentChanged);
 
     // General
-    connect(ui->tabWidget, &QTabWidget::currentChanged, this, &ImageInfoDialog::updateUIElememts);
+    connect(ui->tabWidget, &QTabWidget::currentChanged, this, &ImageInfoDialog::updateUIElements);
 
     connect(ui->pbApply, &QPushButton::clicked, this, &ImageInfoDialog::onApply);
     connect(ui->pbExit, &QPushButton::clicked, this, &ImageInfoDialog::onExit);
@@ -83,7 +83,7 @@ ImageInfoDialog::~ImageInfoDialog()
     delete ui;
 }
 
-void ImageInfoDialog::updateUIElememts()
+void ImageInfoDialog::updateUIElements()
 {
     ui->pbApply->setText(getUIElementName(BtnApply));
     ui->pbApply->setVisible((getPageIndex() != PageProperty));
@@ -211,7 +211,7 @@ QString ImageInfoDialog::getUIElementName(UIElementName name)
     case PageAdjust:
         switch (name) {
         case BtnApply: return "&Apply";
-        case BtnExit: return "&Cancle";
+        case BtnExit: return "&Cancel";
         }
         break;
     default:
