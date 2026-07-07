@@ -22,10 +22,11 @@ Feel free to submit bug report.
 - Selection is currently not available, and may be added in the future releases.
 - Only Import/Export code as Padded (Horizontal) is supported currently. This is right for Adafruit_ssd1306, but for some libraries (lexus2k/ssd1306) you need to manually rotate it by -90 degrees.
 - On color / Off color are not currently editable.
-- Adjust is not available. Visual effects are completed, but has no actual function.
 - Configurations are not saved, and will be lost after closing the main window.
 
 # About
-The project is based on Qt 6.4.2.
+The project is based on Qt 6.4.2 (Community).
+
+Further development is worked on Qt 6.10, so it might not work on Qt 6.4 after several updates.
 
 Special Thanks to [Icons8](https://icons8.com) for providing free icons for the project.
